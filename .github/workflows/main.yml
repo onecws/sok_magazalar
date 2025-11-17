@@ -11,6 +11,11 @@ on:
 
 jobs:
   build:
+    # --- ÇÖZÜM BURADA ---
+    # Bu blok, bota depoya "yazma" (push) izni verir.
+    permissions:
+      contents: write
+
     runs-on: ubuntu-latest # İşlemin çalışacağı sanal sunucu
 
     steps:
@@ -33,6 +38,7 @@ jobs:
         run: python cek.py
 
       # 5. Adım: Oluşturulan yeni magazalar.json dosyasını depoya kaydeder
+      # (Artık izin aldığı için bu adım başarılı olacaktır)
       - name: Değişiklikleri Depoya Geri Yükle
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
