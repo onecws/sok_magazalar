@@ -74,16 +74,16 @@ def main():
             print(f" [{len(subeler)} mağaza bulundu]")
 
             for sube in subeler:
-                # *** YENİ EKLENEN BÖLÜM ***
-                # Artık her mağazanın il ve ilçe bilgisini de kaydediyoruz.
+                # *** DÜZELTME: "YURTDIŞI" SORUNU İÇİN ***
+                # Koordinatların "nokta" ile ayrıldığından ve metin olduğundan emin ol
                 all_stores.append({
                     "id": sube.get("id"),
                     "name": sube.get("name"),
                     "address": sube.get("address"),
-                    "city": city,        # BU EKLENDİ
-                    "district": district,  # BU EKLENDİ
-                    "latitude": sube.get("ltd").replace(",", "."),
-                    "longitude": sube.get("lng").replace(",", ".")
+                    "city": city,
+                    "district": district,
+                    "latitude": str(sube.get("ltd")).replace(",", "."),
+                    "longitude": str(sube.get("lng")).replace(",", ".")
                 })
             total_store_count += len(subeler)
 
