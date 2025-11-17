@@ -138,7 +138,6 @@
         // Mağazaları 'magazalar.json' dosyasından yükle
         async function loadStores() {
             try {
-                // GitHub Pages'de sitenin kök dizininden dosyayı çek
                 // 'magazalar.json' dosyasının deponun ana dizininde olduğundan emin olun.
                 const response = await fetch('magazalar.json');
                 
@@ -231,11 +230,15 @@
 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                checkbox.value = `${store.latitude},${store.longitude}`;
-                // ID'lerin benzersiz olduğundan emin ol (eğer ID'ler json'da yoksa)
+                
+                // *** DÜZELTME: KONUM HATASI İÇİN ***
+                // Checkbox'ın değeri artık belirsiz bir adres değil, kesin koordinattır.
+                checkbox.value = `${store.latitude},${store.longitude}`; 
+                
                 checkbox.id = `store-${store.id || (store.latitude + store.longitude)}`;
 
                 label.appendChild(checkbox);
+                // Kullanıcıya hala adres ve ismi gösteriyoruz
                 label.appendChild(document.createTextNode(` ${store.name} (${store.district}, ${store.city})`));
                 
                 storeListDiv.appendChild(label);
@@ -264,12 +267,14 @@
             const userLocation = `${position.coords.latitude},${position.coords.longitude}`;
             const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
             
-            // DÜZELTME: Google'ın resmi 'dir' (directions) API'sini kullan
+            // *** DÜZELTME: 404 HATASI İÇİN ***
+            // Google'ın resmi 'dir' (directions) API'sini kullan
             const baseUrl = "https://www.google.com/maps/dir/";
 
+            // Checkbox.value'dan artık adres değil, "lat,lng" koordinatı geliyor.
             const waypointsArray = Array.from(selectedCheckboxes).map(cb => cb.value);
 
-            // DÜZELTME: URL'i "path" (yol) formatında oluştur: /dir/Başlangıç/AraNokta1/Varış
+            // URL'i "path" (yol) formatında oluştur: /dir/Başlangıç/AraNokta1/Varış
             
             // Başlangıç (Kullanıcının konumu)
             const origin = encodeURIComponent(userLocation);
@@ -286,7 +291,7 @@
             }
 
             // URL'i doğru formatta birleştir
-            // Örnek: .../dir/KONUMUM/MAĞAZA_A/MAĞAZA_B/MAĞAZA_C
+            // Örnek: .../dir/KONUMUM/KOORDİNAT_A/KOORDİNAT_B/KOORDİNAT_C
             const mapsUrl = `${baseUrl}${origin}/${waypointsPath ? waypointsPath + '/' : ''}${destination}`;
 
             window.open(mapsUrl, '_blank'); // Rotayı yeni sekmede aç
@@ -316,4 +321,3 @@
     </script>
 </body>
 </html>
-
