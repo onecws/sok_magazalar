@@ -135,10 +135,8 @@
 
         // --- MAĞAZA YÜKLEME VE FİLTRELEME ---
 
-        // Mağazaları 'magazalar.json' dosyasından yükle
         async function loadStores() {
             try {
-                // 'magazalar.json' dosyasının deponun ana dizininde olduğundan emin olun.
                 const response = await fetch('magazalar.json');
                 
                 if (!response.ok) {
@@ -157,7 +155,6 @@
             }
         }
 
-        // 1. İl Filtresini Doldur
         function populateIlFilters() {
             const cities = [...new Set(allStoreData.map(store => store.city))];
             cities.sort();
@@ -168,7 +165,6 @@
             });
         }
 
-        // 2. İlçe Filtresini Doldur (İl seçimine göre)
         function populateIlceFilters() {
             const selectedCity = filterIl.value;
             filterIlce.innerHTML = '<option value="">Tüm İlçeler</option>'; 
@@ -191,7 +187,6 @@
             }
         }
 
-        // 3. Ana Filtreleme Fonksiyonu
         function applyFilters() {
             const selectedCity = filterIl.value;
             const selectedDistrict = filterIlce.value;
@@ -215,7 +210,6 @@
             populateStoreList(filteredStores);
         }
 
-        // 4. Mağaza Listesini HTML'e Bas
         function populateStoreList(storesToDisplay) {
             storeListDiv.innerHTML = ''; 
 
@@ -231,21 +225,19 @@
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 
-                // *** DÜZELTME: KONUM HATASI İÇİN ***
-                // Checkbox'ın değeri artık belirsiz bir adres değil, kesin koordinattır.
+                // Checkbox'ın değeri "latitude,longitude" formatında kesin koordinattır.
                 checkbox.value = `${store.latitude},${store.longitude}`; 
                 
                 checkbox.id = `store-${store.id || (store.latitude + store.longitude)}`;
 
                 label.appendChild(checkbox);
-                // Kullanıcıya hala adres ve ismi gösteriyoruz
                 label.appendChild(document.createTextNode(` ${store.name} (${store.district}, ${store.city})`));
                 
                 storeListDiv.appendChild(label);
             });
         }
 
-        // --- ROTA OLUŞTURMA (DÜZELTİLMİŞ) ---
+        // --- ROTA OLUŞTURMA (SON DÜZELTME) ---
 
         function createRoute() {
             const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
@@ -267,32 +259,33 @@
             const userLocation = `${position.coords.latitude},${position.coords.longitude}`;
             const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
             
-            // *** DÜZELTME: 404 HATASI İÇİN ***
-            // Google'ın resmi 'dir' (directions) API'sini kullan
-            const baseUrl = "https://www.google.com/maps/dir/";
+            // "YURTDIŞI" SORUNU İÇİN DÜZELTME:
+            // Google'ın en stabil ve resmi rota oluşturma linkini kullanıyoruz.
+            const baseUrl = "https://www.google.com/maps/dir/?api=1&origin=[START]&destination=[END]&waypoints=[WAYPOINT1]|[WAYPOINT2]";
 
-            // Checkbox.value'dan artık adres değil, "lat,lng" koordinatı geliyor.
+            // Checkbox.value'dan "lat,lng" koordinatları geliyor
             const waypointsArray = Array.from(selectedCheckboxes).map(cb => cb.value);
 
-            // URL'i "path" (yol) formatında oluştur: /dir/Başlangıç/AraNokta1/Varış
+            // Google'ın parametre tabanlı (en güvenilir) formatını oluşturalım:
+            // ?api=1&origin=...&destination=...&waypoints=...|...|...
+            const params = new URLSearchParams();
+            params.append("api", "1");
             
-            // Başlangıç (Kullanıcının konumu)
-            const origin = encodeURIComponent(userLocation);
+            // 1. Başlangıç (Kullanıcının konumu)
+            params.append("origin", userLocation);
 
-            // Varış (Listenin son elemanı)
-            const destination = encodeURIComponent(waypointsArray[waypointsArray.length - 1]);
+            // 2. Varış (Listenin son elemanı)
+            params.append("destination", waypointsArray[waypointsArray.length - 1]);
 
-            // Ara Noktalar (Listenin geri kalanı)
-            let waypointsPath = '';
+            // 3. Ara Noktalar (Listenin geri kalanı)
             if (waypointsArray.length > 1) {
                 const intermediatePoints = waypointsArray.slice(0, waypointsArray.length - 1);
-                // Ara noktaları '/' ile ayır
-                waypointsPath = intermediatePoints.map(addr => encodeURIComponent(addr)).join('/');
+                // Ara noktaları "|" karakteri ile ayır
+                params.append("waypoints", intermediatePoints.join('|'));
             }
 
             // URL'i doğru formatta birleştir
-            // Örnek: .../dir/KONUMUM/KOORDİNAT_A/KOORDİNAT_B/KOORDİNAT_C
-            const mapsUrl = `${baseUrl}${origin}/${waypointsPath ? waypointsPath + '/' : ''}${destination}`;
+            const mapsUrl = `${baseUrl}?${params.toString()}`;
 
             window.open(mapsUrl, '_blank'); // Rotayı yeni sekmede aç
             
