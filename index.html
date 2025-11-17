@@ -137,6 +137,8 @@
 
         async function loadStores() {
             try {
+                // Önbelleği atlamak için rasgele bir parametre ekleyebiliriz (Gerekirse)
+                // const response = await fetch('magazalar.json?v=' + new Date().getTime());
                 const response = await fetch('magazalar.json');
                 
                 if (!response.ok) {
@@ -298,7 +300,7 @@
             createRouteBtn.disabled = false;
         }
 
-        // --- BAŞLANGIÇ ---
+        // --- BAŞLANGIŞ ---
         document.addEventListener('DOMContentLoaded', () => {
             loadStores();
             createRouteBtn.addEventListener('click', createRoute);
