@@ -1,0 +1,40 @@
+# GitHub Actions iş akışının adı
+name: Otomatik Mağaza Güncelleyici
+
+on:
+  # 1. Otomatik Tetikleme: Her hafta Pazar günü saat 03:00'te çalışır.
+  schedule:
+    - cron: '0 3 * * 0'
+  
+  # 2. Manuel Tetikleme: Actions sekmesinden elle çalıştırmanızı sağlar.
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # İşlemin çalışacağı sanal sunucu
+
+    steps:
+      # 1. Adım: Depodaki kodları (cek.py, rota.html vs.) sanal sunucuya kopyalar
+      - name: Depoyu Kopyala
+        uses: actions/checkout@v3
+
+      # 2. Adım: Python'u kurar
+      - name: Python 3.x Kur
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # 3. Adım: Gerekli kütüphaneyi (requests) kurar
+      - name: Kütüphaneleri Kur
+        run: pip install -r requirements.txt
+
+      # 4. Adım: Asıl script'i çalıştırır ve magazalar.json oluşturur
+      - name: Mağaza Verilerini Çek
+        run: python cek.py
+
+      # 5. Adım: Oluşturulan yeni magazalar.json dosyasını depoya kaydeder
+      - name: Değişiklikleri Depoya Geri Yükle
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: 'Otomatik: Mağaza listesi güncellendi'
+          file_pattern: magazalar.json # Sadece bu dosyayı güncelle
