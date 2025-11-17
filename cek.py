@@ -61,4 +61,41 @@ def main():
             print(f" - İlçe: {district} mağazaları çekiliyor...", end="", flush=True)
             magaza_data = fetch_data(session, f"{BASE_URL}{API_URLS['magazalar']}", params={"city": city, "district": district})
             
-            if not magaza_data or not magaza_data.get("response",
+            if not magaza_data or not magaza_data.get("response", {}).get("status", False):
+                print(" [veri yok]")
+                continue
+                
+            subeler = magaza_data.get("response", {}).get("subeler", [])
+            
+            if not subeler:
+                print(" [veri yok]")
+                continue
+
+            print(f" [{len(subeler)} mağaza bulundu]")
+
+            for sube in subeler:
+                # *** DÜZELTME: "YURTDIŞI" VE "TERS KOORDİNAT" SORUNU İÇİN ***
+                # Verilerin doğru anahtarlara atandığından ve virgül yerine nokta kullanıldığından emin ol
+                all_stores.append({
+                    "id": sube.get("id"),
+                    "name": sube.get("name"),
+                    "address": sube.get("address"),
+                    "city": city,
+                    "district": district,
+                    "latitude": str(sube.get("ltd")).replace(",", "."),  # ltd = Latitude (Enlem)
+                    "longitude": str(sube.get("lng")).replace(",", ".") # lng = Longitude (Boylam)
+                })
+            total_store_count += len(subeler)
+
+    try:
+        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+            json.dump(all_stores, f, ensure_ascii=False, indent=4)
+        
+        print(f"\n--- BAŞARILI ---")
+        print(f"Toplam {total_store_count} mağaza verisi '{OUTPUT_FILE}' dosyasına kaydedildi.")
+
+    except IOError as e:
+        print(f"Hata: '{OUTPUT_FILE}' dosyası yazılamadı. {e}")
+
+if __name__ == "__main__":
+    main()
