@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Şok Market Rota Oluşturucu</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        h2 {
+            color: #ff6000;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .filter-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .filter-container select, #search-box {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #store-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #fafafa;
+        }
+        .store-item {
+            display: block;
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .store-item:hover {
+            background-color: #f0f0f0;
+        }
+        .store-item input {
+            margin-right: 10px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #555;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>🛒 Şok Mağazaları Rota Planlayıcı</h2>
+        
+        <div class="filter-container">
+            <select id="filter-il">
+                <option value="">Tüm İller</option>
+            </select>
+            <select id="filter-ilce" disabled>
+                <option value="">Tüm İlçeler</option>
+            </select>
+        </div>
+        
+        <input type="text" id="search-box" placeholder="Arama (örn: Beşiktaş) ve filtreler...">
+
+        <div id="store-list">
+            <p id="loading-stores">Mağaza listesi (magazalar.json) yükleniyor...</p>
+        </div>
+
+        <button id="create-route-btn">Seçili Mağazalarla Rota Oluştur</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        let allStoreData = [];
+        
+        const storeListDiv = document.getElementById('store-list');
+        const createRouteBtn = document.getElementById('create-route-btn');
+        const statusDiv = document.getElementById('status');
+        const searchBox = document.getElementById('search-box');
+        const loadingMessage = document.getElementById('loading-stores');
+        const filterIl = document.getElementById('filter-il');
+        const filterIlce = document.getElementById('filter-ilce');
+
+        // Mağazaları 'magazalar.json' dosyasından yükle
+        async function loadStores() {
+            try {
+                const response = await fetch('magazalar.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP hatası! Durum: ${response.status}. 'magazalar.json' dosyasını 'cek.py' scripti ile oluşturdunuz mu?`);
+                }
+                allStoreData = await response.json();
+                
+                loadingMessage.textContent = `${allStoreData.length} mağaza yüklendi.`;
+                
+                // 1. İl Filtresini Doldur
+                populateIlFilters();
+                // 2. Başlangıçta tüm listeyi göster
+                applyFilters();
+
+            } catch (error) {
+                loadingMessage.textContent = `HATA: Mağazalar yüklenemedi. ${error.message}`;
+                loadingMessage.style.color = 'red';
+            }
+        }
+
+        // 1. İl Filtresini Doldur
+        function populateIlFilters() {
+            // Tüm mağazaları gez, eşsiz şehir isimlerini bul
+            const cities = [...new Set(allStoreData.map(store => store.city))];
+            cities.sort(); // Alfabetik sırala
+            
+            cities.forEach(city => {
+                const option = new Option(city, city);
+                filterIl.add(option);
+            });
+        }
+
+        // 2. İlçe Filtresini Doldur (İl seçimine göre)
+        function populateIlceFilters() {
+            const selectedCity = filterIl.value;
+            filterIlce.innerHTML = '<option value="">Tüm İlçeler</option>'; // Temizle
+
+            if (selectedCity) {
+                // Sadece seçili ile ait eşsiz ilçe isimlerini bul
+                const districts = [...new Set(
+                    allStoreData
+                        .filter(store => store.city === selectedCity)
+                        .map(store => store.district)
+                )];
+                districts.sort(); // Alfabetik sırala
+
+                districts.forEach(district => {
+                    const option = new Option(district, district);
+                    filterIlce.add(option);
+                });
+                filterIlce.disabled = false;
+            } else {
+                filterIlce.disabled = true; // İl seçili değilse ilçeyi kapat
+            }
+        }
+
+        // 3. Ana Filtreleme Fonksiyonu
+        function applyFilters() {
+            const selectedCity = filterIl.value;
+            const selectedDistrict = filterIlce.value;
+            const searchQuery = searchBox.value.toLowerCase().trim();
+
+            let filteredStores = allStoreData;
+
+            // İl filtresi
+            if (selectedCity) {
+                filteredStores = filteredStores.filter(store => store.city === selectedCity);
+            }
+
+            // İlçe filtresi
+            if (selectedDistrict) {
+                filteredStores = filteredStores.filter(store => store.district === selectedDistrict);
+            }
+
+            // Arama filtresi
+            if (searchQuery.length > 1) {
+                filteredStores = filteredStores.filter(store => {
+                    return store.name.toLowerCase().includes(searchQuery) || 
+                           store.address.toLowerCase().includes(searchQuery);
+                });
+            }
+
+            // Mağaza listesini HTML'de güncelle
+            populateStoreList(filteredStores);
+        }
+
+        // 4. Mağaza Listesini HTML'e Bas
+        function populateStoreList(storesToDisplay) {
+            storeListDiv.innerHTML = ''; 
+
+            if (storesToDisplay.length === 0) {
+                storeListDiv.innerHTML = '<p>Filtrelerle eşleşen mağaza bulunamadı.</p>';
+                return;
+            }
+
+            storesToDisplay.forEach(store => {
+                const label = document.createElement('label');
+                label.className = 'store-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = store.address; 
+                checkbox.id = `store-${store.id}`;
+
+                label.appendChild(checkbox);
+                // Listede il/ilçe bilgisini de gösterelim
+                label.appendChild(document.createTextNode(` ${store.name} (${store.district}, ${store.city})`));
+                
+                storeListDiv.appendChild(label);
+            });
+        }
+
+        // --- ROTA OLUŞTURMA (Değişiklik yok) ---
+        function createRoute() {
+            const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
+            if (selectedCheckboxes.length === 0) {
+                statusDiv.textContent = 'Lütfen en az bir mağaza seçin.';
+                return;
+            }
+            statusDiv.textContent = 'Konumunuz alınıyor...';
+            createRouteBtn.disabled = true;
+            if (!navigator.geolocation) {
+                statusDiv.textContent = 'Tarayıcınız konum servisini desteklemiyor.';
+                createRouteBtn.disabled = false;
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(onSuccess, onError);
+        }
+
+        function onSuccess(position) {
+            const userLocation = `${position.coords.latitude},${position.coords.longitude}`;
+            const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
+            const baseUrl = "http://googleusercontent.com/maps.google.com/8";
+            const origin = `&origin=${userLocation}`;
+            const waypointsArray = Array.from(selectedCheckboxes).map(cb => cb.value);
+            const destination = `&destination=${encodeURIComponent(waypointsArray[waypointsArray.length - 1])}`;
+            let waypoints = '';
+            if (waypointsArray.length > 1) {
+                const intermediatePoints = waypointsArray.slice(0, waypointsArray.length - 1);
+                waypoints = `&waypoints=${intermediatePoints.map(addr => encodeURIComponent(addr)).join('|')}`;
+            }
+            const mapsUrl = `${baseUrl}${origin}${destination}${waypoints}`;
+            window.open(mapsUrl, '_blank');
+            createRouteBtn.disabled = false;
+            statusDiv.textContent = '';
+        }
+
+        function onError(error) {
+            statusDiv.textContent = `Konum alınamadı. Hata: ${error.message}.`;
+            createRouteBtn.disabled = false;
+        }
+
+        // --- BAŞLANGIÇ ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStores(); // Sayfa yüklendiğinde mağazaları JSON'dan çek
+            createRouteBtn.addEventListener('click', createRoute);
+            
+            // Filtreler için event listener'lar
+            filterIl.addEventListener('change', () => {
+                populateIlceFilters(); // İl değiştiğinde ilçe listesini güncelle
+                applyFilters(); // Listeyi filtrele
+            });
+            filterIlce.addEventListener('change', applyFilters);
+            searchBox.addEventListener('keyup', applyFilters);
+        });
+
+    </script>
+</body>
+</html>
