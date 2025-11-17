@@ -231,7 +231,7 @@
 
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                checkbox.value = store.address; 
+                checkbox.value = `${store.latitude},${store.longitude}`;
                 // ID'lerin benzersiz olduğundan emin ol (eğer ID'ler json'da yoksa)
                 checkbox.id = `store-${store.id || (store.latitude + store.longitude)}`;
 
@@ -316,3 +316,4 @@
     </script>
 </body>
 </html>
+
