@@ -75,15 +75,15 @@ def main():
 
             for sube in subeler:
                 # *** DÜZELTME: "YURTDIŞI" SORUNU İÇİN ***
-                # Koordinatların "nokta" ile ayrıldığından ve metin olduğundan emin ol
+                # Verilerin doğru anahtarlara atandığından ve virgül yerine nokta kullanıldığından emin ol
                 all_stores.append({
                     "id": sube.get("id"),
                     "name": sube.get("name"),
                     "address": sube.get("address"),
                     "city": city,
                     "district": district,
-                    "latitude": str(sube.get("ltd")).replace(",", "."),
-                    "longitude": str(sube.get("lng")).replace(",", ".")
+                    "latitude": str(sube.get("ltd")).replace(",", "."),  # ltd = Latitude (Enlem)
+                    "longitude": str(sube.get("lng")).replace(",", ".") # lng = Longitude (Boylam)
                 })
             total_store_count += len(subeler)
 
