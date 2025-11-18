@@ -82,8 +82,8 @@ def main():
                     "address": sube.get("address"),
                     "city": city,
                     "district": district,
-                    "latitude": str(sube.get("ltd")).replace(",", "."),
-                    "longitude": str(sube.get("lng")).replace(",", ".")
+                    "longitude": str(sube.get("lng")).replace(",", "."),
+                    "latitude": str(sube.get("ltd")).replace(",", ".")
                 })
             total_store_count += len(subeler)
 
@@ -99,3 +99,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
