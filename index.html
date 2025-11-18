@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Şok Market Rota Oluşturucu (TEST MODU v4)</title>
+    <title>Şok Market Rota Oluşturucu (TEST MODU v5 - FİNAL)</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -109,7 +109,7 @@
         <input type="text" id="search-box" placeholder="Arama (örn: Beşiktaş) ve filtreler...">
 
         <div id="store-list">
-            <p id="loading-stores">Mağaza listesi (TEST MODU v4) yükleniyor...</p>
+            <p id="loading-stores">Mağaza listesi (TEST MODU v5) yükleniyor...</p>
         </div>
 
         <button id="create-route-btn">Seçili Mağazalarla Rota Oluştur</button>
@@ -270,8 +270,8 @@
             const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
             
             // *** DÜZELTME: 404 HATASI İÇİN ***
-            // DOĞRU Google Maps linkini kullanıyoruz (sonda / ile).
-            const baseUrl = "http://googleusercontent.com/maps.google.com/";
+            // DOĞRU Google Maps linkini kullanıyoruz: "http://googleusercontent.com/maps.google.com/"
+            const baseUrl = "maps.google.com/8&origin...";
 
             const waypointsArray = Array.from(selectedCheckboxes).map(cb => cb.value);
 
