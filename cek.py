@@ -14,70 +14,59 @@ OUTPUT_FILE = "magazalar.json"
 
 
 def fetch_data(session, url, params=None):
-    """
-    Belirtilen URL'den veri çeken yardımcı fonksiyon.
-    Hata durumunda None döner.
-    """
+    """Belirtilen URL'den veri çeken yardımcı fonksiyon."""
     try:
-        resp = session.get(url, params=params, timeout=15)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.RequestException as e:
-        print(f"\n[HATA] İstek hatası: {e} | URL: {url}")
+        response = session.get(url, params=params, timeout=15)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Hata: {url} adresine ulaşılamadı. {e}")
         return None
-    except ValueError:
-        print(f"\n[HATA] JSON parse edilemedi | URL: {url}")
+    except json.JSONDecodeError:
+        print(f"Hata: Geçersiz JSON yanıtı alındı: {url}")
         return None
 
 
 def main():
+    """Tüm mağaza verilerini çekip JSON dosyasına kaydeder."""
     session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0",
+        "Referer": f"{BASE_URL}/magazalarimiz"
+    })
+
+    print("1. Adım: Şehir listesi çekiliyor...")
+    sehir_data = fetch_data(session, f"{BASE_URL}{API_URLS['sehirler']}")
+
+    # --- DÜZELTME: cities değil response.sehirler ---
+    if not sehir_data or "response" not in sehir_data or "sehirler" not in sehir_data["response"]:
+        print("Şehirler alınamadı. Script durduruluyor.")
+        return
+
+    sehirler = [s.get("sehir") for s in sehir_data["response"]["sehirler"]]
+    print(f"Toplam {len(sehirler)} şehir bulundu.")
+
     all_stores = []
     total_store_count = 0
 
-    print("--- Şok Market Mağaza Verileri Çekiliyor ---")
+    for city in sehirler:
+        print(f"\nİşleniyor: {city}")
 
-    # 1) Şehirleri çek
-    sehirler_data = fetch_data(session, f"{BASE_URL}{API_URLS['sehirler']}")
-    if not sehirler_data or not sehirler_data.get("response", {}).get("sehirler"):
-        print("[HATA] Şehir verisi çekilemedi veya boş.")
-        return
+        ilce_data = fetch_data(session, f"{BASE_URL}{API_URLS['ilceler']}", params={"city": city})
 
-    sehirler = sehirler_data.get("response", {}).get("sehirler", [])
-    # API'de şehir yapısı genelde {'sehir': 'ADANA'} gibi
-    cities = [s.get("sehir") for s in sehirler if s.get("sehir")]
-
-    print(f"Toplam şehir sayısı: {len(cities)}")
-
-    # 2) Her şehir için ilçeleri ve mağazaları çek
-    for city in cities:
-        print(f"\nŞehir: {city}")
-
-        # İlçeler
-        ilceler_data = fetch_data(
-            session,
-            f"{BASE_URL}{API_URLS['ilceler']}",
-            params={"city": city}
-        )
-
-        if not ilceler_data or not ilceler_data.get("response", {}).get("ilceler"):
-            print("  [HATA] İlçe verisi yok veya çekilemedi.")
+        # --- DÜZELTME: districts değil response.ilceler ---
+        if not ilce_data or "response" not in ilce_data or "ilceler" not in ilce_data["response"]:
+            print(f" - {city} için ilçeler alınamadı.")
             continue
 
-        ilceler = ilceler_data.get("response", {}).get("ilceler", [])
-        districts = [i.get("ilce") for i in ilceler if i.get("ilce")]
+        ilceler = [i.get("ilce") for i in ilce_data["response"]["ilceler"]]
 
-        # Her ilçe için mağazaları çek
-        for district in districts:
+        for district in ilceler:
             print(f" - İlçe: {district} mağazaları çekiliyor...", end="", flush=True)
 
-            magaza_data = fetch_data(
-                session,
-                f"{BASE_URL}{API_URLS['magazalar']}",
-                params={"city": city, "district": district}
-            )
+            magaza_data = fetch_data(session, f"{BASE_URL}{API_URLS['magazalar']}",
+                                     params={"city": city, "district": district})
 
-            # response.status false ise veya response yoksa
             if not magaza_data or not magaza_data.get("response", {}).get("status", False):
                 print(" [veri yok]")
                 continue
@@ -91,20 +80,20 @@ def main():
             print(f" [{len(subeler)} mağaza bulundu]")
 
             for sube in subeler:
-                # *** ÖNEMLİ DÜZELTME: Koordinatlar ters geldiği için swap yapıyoruz ***
-                # API'deki:
-                #   - sube['ltd']  ~ 35.xxx (boylam)
-                #   - sube['lng']  ~ 37.xxx (enlem)
-                #
-                # Biz JSON'da:
-                #   latitude  -> enlem  -> sube['lng']
-                #   longitude -> boylam -> sube['ltd']
 
-                raw_ltd = sube.get("ltd")
-                raw_lng = sube.get("lng")
+                # --- KOORDİNAT DÜZELTME ---
+                # API:
+                #   ltd = boylam
+                #   lng = enlem
+                # Biz:
+                #   latitude = lng
+                #   longitude = ltd
 
-                latitude = str(raw_lng).replace(",", ".") if raw_lng is not None else ""
-                longitude = str(raw_ltd).replace(",", ".") if raw_ltd is not None else ""
+                raw_lng = sube.get("lng")  # enlem
+                raw_ltd = sube.get("ltd")  # boylam
+
+                latitude = str(raw_lng).replace(",", ".") if raw_lng else ""
+                longitude = str(raw_ltd).replace(",", ".") if raw_ltd else ""
 
                 all_stores.append({
                     "id": sube.get("id"),
@@ -118,20 +107,16 @@ def main():
 
             total_store_count += len(subeler)
 
-    # 3) Tüm mağazaları JSON'a yaz
+    # JSON'a yaz
     try:
-        # İstersen tam path ile çalış:
-        # output_path = os.path.join(os.path.dirname(__file__), OUTPUT_FILE)
-        output_path = OUTPUT_FILE
-
-        with open(output_path, "w", encoding="utf-8") as f:
+        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
             json.dump(all_stores, f, ensure_ascii=False, indent=4)
 
         print("\n--- BAŞARILI ---")
-        print(f"Toplam {total_store_count} mağaza verisi '{output_path}' dosyasına kaydedildi.")
+        print(f"Toplam {total_store_count} mağaza verisi '{OUTPUT_FILE}' dosyasına kaydedildi.")
 
     except IOError as e:
-        print(f"[HATA] '{OUTPUT_FILE}' dosyası yazılamadı. Ayrıntı: {e}")
+        print(f"Hata: '{OUTPUT_FILE}' dosyası yazılamadı. {e}")
 
 
 if __name__ == "__main__":
