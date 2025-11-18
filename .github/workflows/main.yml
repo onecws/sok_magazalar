@@ -1,48 +1,47 @@
-# GitHub Actions iş akışının adı
 name: Otomatik Mağaza Güncelleyici
 
 on:
-  # 1. Otomatik Tetikleme: Her hafta Pazar günü saat 03:00'te çalışır.
+  # Haftalık otomatik çalışma (Pazar 03:00)
   schedule:
     - cron: '0 3 * * 0'
-  
-  # 2. Manuel Tetikleme: Actions sekmesinden elle çalıştırmanızı sağlar.
+
+  # Manuel tetikleme
   workflow_dispatch:
 
 jobs:
   build:
-    # Depoya yazma izni
     permissions:
       contents: write
 
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Depoyu klonla
+      # 1) Depoyu kopyala
       - name: Depoyu Kopyala
         uses: actions/checkout@v3
 
-      # 2. Python kur
+      # 2) Python kur
       - name: Python 3.x Kur
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # 3. Requests kütüphanesini kur
+      # 3) Gerekli kütüphaneleri kur
       - name: Kütüphaneleri Kur
         run: |
           pip install --upgrade pip
           pip install requests
+          pip install cloudscraper
 
-      # 4. Mağaza verilerini çek (hibrit API + HTML fallback destekli)
+      # 4) Çekme scriptini çalıştır
       - name: Mağaza Verilerini Çek
         run: |
           echo "🚀 Çekme işlemi başlatılıyor..."
-          python cek.py || (echo "❌ İlk çalıştırma hata verdi, 10 saniye sonra tekrar deneniyor." && sleep 10 && python cek.py)
+          python cek.py || (echo "❌ İlk deneme hata verdi, 10sn sonra tekrar..." && sleep 10 && python cek.py)
 
-      # 5. magazalar.json’u depoya push et
+      # 5) magazalar.json dosyasını otomatik commit et
       - name: Değişiklikleri Depoya Geri Yükle
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: 'Otomatik: Mağaza listesi güncellendi'
+          commit_message: "Otomatik: Mağaza listesi güncellendi"
           file_pattern: magazalar.json
