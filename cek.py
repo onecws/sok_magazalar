@@ -1,102 +1,164 @@
 import requests
 import json
-import os
+import re
 
-# --- Ayarlar ---
 BASE_URL = "https://kurumsal.sokmarket.com.tr"
-API_URLS = {
-    "sehirler": "/ajax/servis/sehirler",
-    "ilceler": "/ajax/servis/ilceler",
-    "magazalar": "/ajax/servis/magazalarimiz"
-}
 OUTPUT_FILE = "magazalar.json"
-# --- ---
 
-def fetch_data(session, url, params=None):
-    """Belirtilen URL'den veri çeken yardımcı fonksiyon."""
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    "Referer": "https://kurumsal.sokmarket.com.tr/magazalarimiz"
+}
+
+# ----------------------------------------------------
+# 1) Güvenli JSON fetch
+# ----------------------------------------------------
+def fetch_json(url, params=None):
     try:
-        response = session.get(url, params=params, timeout=15)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Hata: {url} adresine ulaşılamadı. {e}")
-        return None
-    except json.JSONDecodeError:
-        print(f"Hata: Geçersiz JSON yanıtı alındı: {url}")
+        r = requests.get(url, params=params, headers=HEADERS, timeout=20)
+        r.raise_for_status()
+        return r.json()
+    except:
         return None
 
-def main():
-    """Tüm mağaza verilerini çekip JSON dosyasına kaydeder."""
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        "Referer": f"{BASE_URL}/magazalarimiz"
-    })
 
-    print("1. Adım: Şehir listesi çekiliyor...")
-    sehir_data = fetch_data(session, f"{BASE_URL}{API_URLS['sehirler']}")
-    
-    if not sehir_data or "cities" not in sehir_data:
-        print("Şehirler alınamadı. Script durduruluyor.")
-        return
+# ----------------------------------------------------
+# 2) HTML içindeki gömülü JS verisini parse et
+# ----------------------------------------------------
+def fetch_html_embedded_data():
+    print("⚠ API başarısız → HTML fallback moduna geçiliyor...")
+
+    try:
+        r = requests.get(f"{BASE_URL}/magazalarimiz", headers=HEADERS, timeout=20)
+        r.raise_for_status()
+    except:
+        print("❌ HTML veri okunamadı.")
+        return None
+
+    html = r.text
+
+    # window.__INITIAL_STATE__ = {...}
+    match = re.search(r"window\.__INITIAL_STATE__\s*=\s*(\{.*?\});", html, re.DOTALL)
+    if not match:
+        print("❌ HTML içinde gömülü JSON bulunamadı.")
+        return None
+
+    try:
+        state = json.loads(match.group(1))
+        return state
+    except:
+        print("❌ Gömülü JSON parse edilemedi.")
+        return None
+
+
+# ----------------------------------------------------
+# 3) API'den mağaza bilgisi çek
+# ----------------------------------------------------
+def get_from_api():
+    print("🔍 API’den şehirler çekiliyor...")
+
+    data = fetch_json(f"{BASE_URL}/ajax/servis/sehirler")
+    if not data or "response" not in data:
+        return None  # API fallback aktif olur
+
+    cities = [c["sehir"] for c in data["response"]["sehirler"]]
 
     all_stores = []
-    total_store_count = 0
-    
-    cities = sehir_data["cities"]
-    print(f"Toplam {len(cities)} şehir bulundu.")
 
     for city in cities:
-        print(f"\nİşleniyor: {city}")
-        
-        ilce_data = fetch_data(session, f"{BASE_URL}{API_URLS['ilceler']}", params={"city": city})
-        
-        if not ilce_data or "districts" not in ilce_data:
-            print(f" - {city} için ilçeler alınamadı.")
+        print(f"\n🏙 Şehir: {city}")
+
+        ilce_data = fetch_json(f"{BASE_URL}/ajax/servis/ilceler", {"city": city})
+        if not ilce_data or "response" not in ilce_data:
+            print("  ❌ İlçeler alınamadı.")
             continue
-        
-        districts = ilce_data["districts"]
-        
+
+        districts = [d["ilce"] for d in ilce_data["response"]["ilceler"]]
+
         for district in districts:
-            print(f" - İlçe: {district} mağazaları çekiliyor...", end="", flush=True)
-            magaza_data = fetch_data(session, f"{BASE_URL}{API_URLS['magazalar']}", params={"city": city, "district": district})
-            
-            if not magaza_data or not magaza_data.get("response", {}).get("status", False):
-                print(" [veri yok]")
-                continue
-                
-            subeler = magaza_data.get("response", {}).get("subeler", [])
-            
-            if not subeler:
-                print(" [veri yok]")
+            print(f"  📍 İlçe: {district}...", end="", flush=True)
+
+            store_data = fetch_json(
+                f"{BASE_URL}/ajax/servis/magazalarimiz",
+                {"city": city, "district": district}
+            )
+
+            if not store_data or not store_data.get("response", {}).get("status", False):
+                print(" veri yok")
                 continue
 
-            print(f" [{len(subeler)} mağaza bulundu]")
+            subeler = store_data["response"].get("subeler", [])
+            print(f" {len(subeler)} mağaza")
 
-            for sube in subeler:
-                # *** DÜZELTME: "YURTDIŞI" SORUNU İÇİN ***
-                # Koordinatların "nokta" ile ayrıldığından ve metin olduğundan emin ol
+            for s in subeler:
+                latitude = str(s.get("lng")).replace(",", ".")
+                longitude = str(s.get("ltd")).replace(",", ".")
+
                 all_stores.append({
-                    "id": sube.get("id"),
-                    "name": sube.get("name"),
-                    "address": sube.get("address"),
+                    "id": s.get("id"),
+                    "name": s.get("name"),
+                    "address": s.get("address"),
                     "city": city,
                     "district": district,
-                    "longitude": str(sube.get("lng")).replace(",", "."),
-                    "latitude": str(sube.get("ltd")).replace(",", ".")
+                    "latitude": latitude,
+                    "longitude": longitude
                 })
-            total_store_count += len(subeler)
 
-    try:
-        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-            json.dump(all_stores, f, ensure_ascii=False, indent=4)
-        
-        print(f"\n--- BAŞARILI ---")
-        print(f"Toplam {total_store_count} mağaza verisi '{OUTPUT_FILE}' dosyasına kaydedildi.")
+    return all_stores
 
-    except IOError as e:
-        print(f"Hata: '{OUTPUT_FILE}' dosyası yazılamadı. {e}")
+
+# ----------------------------------------------------
+# 4) HTML fallback modunda veri çek
+# ----------------------------------------------------
+def get_from_html(state):
+    print("🔄 HTML fallback verileri okunuyor...")
+
+    all_stores = []
+
+    cities = state.get("cities", [])
+    districts_map = state.get("districts", {})
+    stores = state.get("stores", [])
+
+    for store in stores:
+        lat = str(store.get("latitude")).replace(",", ".")
+        lng = str(store.get("longitude")).replace(",", ".")
+
+        all_stores.append({
+            "id": store.get("id"),
+            "name": store.get("name"),
+            "address": store.get("address"),
+            "city": store.get("city"),
+            "district": store.get("district"),
+            "latitude": lat,
+            "longitude": lng
+        })
+
+    return all_stores
+
+
+# ----------------------------------------------------
+# 5) Main
+# ----------------------------------------------------
+def main():
+    # Önce API’yi dene
+    stores = get_from_api()
+
+    if stores is None:
+        # API çalışmadı → HTML fallback
+        state = fetch_html_embedded_data()
+        if not state:
+            print("❌ Veri hiçbir kaynaktan alınamadı.")
+            return
+
+        stores = get_from_html(state)
+
+    # JSON’a yaz
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(stores, f, ensure_ascii=False, indent=4)
+
+    print("\n🎉 İşlem tamamlandı!")
+    print(f"📦 Toplam {len(stores)} mağaza kaydedildi → {OUTPUT_FILE}")
+
 
 if __name__ == "__main__":
     main()
-
