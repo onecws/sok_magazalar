@@ -11,36 +11,38 @@ on:
 
 jobs:
   build:
-    # --- ÇÖZÜM BURADA ---
-    # Bu blok, bota depoya "yazma" (push) izni verir.
+    # Depoya yazma izni
     permissions:
       contents: write
 
-    runs-on: ubuntu-latest # İşlemin çalışacağı sanal sunucu
+    runs-on: ubuntu-latest
 
     steps:
-      # 1. Adım: Depodaki kodları (cek.py, rota.html vs.) sanal sunucuya kopyalar
+      # 1. Depoyu klonla
       - name: Depoyu Kopyala
         uses: actions/checkout@v3
 
-      # 2. Adım: Python'u kurar
+      # 2. Python kur
       - name: Python 3.x Kur
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # 3. Adım: Gerekli kütüphaneyi (requests) kurar
+      # 3. Requests kütüphanesini kur
       - name: Kütüphaneleri Kur
-        run: pip install -r requirements.txt
+        run: |
+          pip install --upgrade pip
+          pip install requests
 
-      # 4. Adım: Asıl script'i çalıştırır ve magazalar.json oluşturur
+      # 4. Mağaza verilerini çek (hibrit API + HTML fallback destekli)
       - name: Mağaza Verilerini Çek
-        run: python cek.py
+        run: |
+          echo "🚀 Çekme işlemi başlatılıyor..."
+          python cek.py || (echo "❌ İlk çalıştırma hata verdi, 10 saniye sonra tekrar deneniyor." && sleep 10 && python cek.py)
 
-      # 5. Adım: Oluşturulan yeni magazalar.json dosyasını depoya kaydeder
-      # (Artık izin aldığı için bu adım başarılı olacaktır)
+      # 5. magazalar.json’u depoya push et
       - name: Değişiklikleri Depoya Geri Yükle
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: 'Otomatik: Mağaza listesi güncellendi'
-          file_pattern: magazalar.json # Sadece bu dosyayı güncelle
+          file_pattern: magazalar.json
