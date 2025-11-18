@@ -135,27 +135,7 @@
 
         // --- MAĞAZA YÜKLEME VE FİLTRELEME ---
 
-        async function loadStores() {
-            try {
-                // Önbelleği atlamak için rasgele bir parametre ekleyebiliriz (Gerekirse)
-                // const response = await fetch('magazalar.json?v=' + new Date().getTime());
-                const response = await fetch('magazalar.json');
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP hatası! Durum: ${response.status}. 'magazalar.json' dosyası GitHub Actions ile oluşturuldu mu?`);
-                }
-                allStoreData = await response.json();
-                
-                loadingMessage.textContent = `${allStoreData.length} mağaza yüklendi.`;
-                
-                populateIlFilters();
-                applyFilters();
-
-            } catch (error) {
-                loadingMessage.textContent = `HATA: Mağazalar yüklenemedi. ${error.message}`;
-                loadingMessage.style.color = 'red';
-            }
-        }
+            
 
         function populateIlFilters() {
             const cities = [...new Set(allStoreData.map(store => store.city))];
@@ -316,3 +296,4 @@
     </script>
 </body>
 </html>
+
