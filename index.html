@@ -2,111 +2,44 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Mağaza Listesi & Rota Oluşturucu</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ŞOK Mağaza Rota Oluşturucu</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #f4f6f9;
-        margin: 0;
-        padding: 0;
-    }
+body { font-family: Arial; background:#eef2f5; margin:0; }
+header { background:#004aad; color:white; text-align:center; padding:20px; font-size:24px; }
+.container { max-width:900px; margin:auto; padding:20px; }
 
-    header {
-        background: #004aad;
-        color: white;
-        padding: 20px;
-        text-align: center;
-        font-size: 24px;
-        font-weight: bold;
-        letter-spacing: 0.5px;
-    }
+.filters { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
 
-    .container {
-        max-width: 850px;
-        margin: auto;
-        padding: 20px;
-    }
+input,select {
+    padding:12px; border-radius:8px; border:1px solid #ccc; font-size:15px;
+}
 
-    .filters {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 15px;
-    }
+button {
+    background:#004aad; color:white; padding:14px 20px; border:none; border-radius:8px;
+    font-size:17px; cursor:pointer; margin-bottom:20px;
+}
+button:hover { background:#00347a; }
 
-    input, select {
-        padding: 12px;
-        border-radius: 8px;
-        border: 1px solid #ccc;
-        font-size: 16px;
-        flex: 1;
-        min-width: 180px;
-    }
+.store { background:white; padding:15px; border-radius:10px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.15); margin-bottom:12px;
+}
 
-    button {
-        background: #004aad;
-        color: white;
-        border: none;
-        padding: 14px 20px;
-        font-size: 17px;
-        border-radius: 8px;
-        cursor: pointer;
-        margin-bottom: 20px;
-    }
+.store b { font-size:18px; color:#004aad; }
+.distance { font-size:13px; color:#666; }
 
-    button:hover {
-        background: #00347a;
-    }
-
-    .store {
-        background: white;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 12px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        transition: 0.2s ease;
-    }
-
-    .store:hover {
-        transform: scale(1.01);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-
-    .store b {
-        font-size: 18px;
-        color: #004aad;
-    }
-
-    .distance {
-        font-size: 13px;
-        color: #666;
-    }
-
-    @media(max-width: 600px) {
-        header {
-            font-size: 20px;
-        }
-        input, select {
-            font-size: 14px;
-            padding: 10px;
-        }
-        button {
-            font-size: 15px;
-        }
-    }
 </style>
 </head>
 
 <body>
 
-<header>ŞOK Mağaza Listesi & Rota Oluşturucu</header>
+<header>ŞOK Mağaza Listesi & Rota Oluştur</header>
 
 <div class="container">
 
     <div class="filters">
-        <input type="text" id="searchInput" placeholder="Mağaza / İl / İlçe ara...">
+        <input type="text" id="searchInput" placeholder="Mağaza, il, ilçe ara...">
         <select id="cityFilter"></select>
         <select id="districtFilter"></select>
     </div>
@@ -122,35 +55,28 @@ let stores = [];
 let filtered = [];
 
 async function loadStores() {
-    const res = await fetch("magazalar.json");
+    const res = await fetch("magazalar.json?nocache=" + Date.now());
     stores = await res.json();
     filtered = stores;
 
-    populateCityFilter();
-    populateDistrictFilter();
+    fillCityFilter();
+    fillDistrictFilter();
     renderStores();
 }
 
-function populateCityFilter() {
-    const cities = [...new Set(stores.map(s => s.city))];
+function fillCityFilter() {
     const citySelect = document.getElementById("cityFilter");
+    const cities = [...new Set(stores.map(s => s.city))];
 
     citySelect.innerHTML = "<option value=''>Tüm Şehirler</option>" +
         cities.map(c => `<option value="${c}">${c}</option>`).join("");
 
     citySelect.onchange = () => {
-        const city = citySelect.value;
-        if (city) {
-            filtered = stores.filter(s => s.city === city);
-        } else {
-            filtered = stores;
-        }
-        populateDistrictFilter();
-        renderStores();
+        filterAll();
     };
 }
 
-function populateDistrictFilter() {
+function fillDistrictFilter() {
     const districtSelect = document.getElementById("districtFilter");
 
     const districts = [...new Set(filtered.map(s => s.district))];
@@ -159,53 +85,61 @@ function populateDistrictFilter() {
         districts.map(d => `<option value="${d}">${d}</option>`).join("");
 
     districtSelect.onchange = () => {
-        const district = districtSelect.value;
-        if (district) {
-            filtered = filtered.filter(s => s.district === district);
-        } else {
-            filtered = stores;
-        }
-        renderStores();
+        filterAll();
     };
 }
 
-document.getElementById("searchInput").oninput = (e) => {
-    const q = e.target.value.toLowerCase();
+function filterAll() {
+    const q = document.getElementById("searchInput").value.toLowerCase();
+    const city = document.getElementById("cityFilter").value;
+    const district = document.getElementById("districtFilter").value;
+
     filtered = stores.filter(s =>
-        s.name.toLowerCase().includes(q) ||
-        s.city.toLowerCase().includes(q) ||
-        s.district.toLowerCase().includes(q)
+        (s.name.toLowerCase().includes(q) ||
+         s.city.toLowerCase().includes(q) ||
+         s.district.toLowerCase().includes(q)) &&
+        (city ? s.city === city : true) &&
+        (district ? s.district === district : true)
     );
+
+    fillDistrictFilter();
     renderStores();
-};
+}
+
+document.getElementById("searchInput").oninput = filterAll;
 
 function renderStores() {
-    const container = document.getElementById("storeList");
-    container.innerHTML = filtered.map(s => `
+    document.getElementById("storeList").innerHTML =
+        filtered.map(s => `
         <div class="store">
-            <b>${s.name}</b><br>
-            ${s.city} / ${s.district}<br>
-            ${s.address}<br>
-            <span class="distance">${s.distance_km} km uzaklıkta</span>
+            <label style="display:flex; gap:10px; align-items:flex-start;">
+                <input type="checkbox" class="storeChk" value="${s.latitude},${s.longitude}">
+                <div>
+                    <b>${s.name}</b><br>
+                    ${s.city} / ${s.district}<br>
+                    ${s.address}<br>
+                    <span class="distance">${s.distance_km} km uzaklıkta</span>
+                </div>
+            </label>
         </div>
-    `).join("");
+        `).join("");
 }
 
 function createRoute() {
-    if (filtered.length < 2) {
-        alert("Rota için en az 2 mağaza seçilmeli (filtrelediğin mağazalar).");
+    const selected = [...document.querySelectorAll(".storeChk:checked")]
+        .map(ch => ch.value);
+
+    if (selected.length < 2) {
+        alert("Lütfen en az 2 mağaza seçin.");
         return;
     }
 
-    const origin = `${filtered[0].latitude},${filtered[0].longitude}`;
-    const destination = `${filtered[filtered.length - 1].latitude},${filtered[filtered.length - 1].longitude}`;
-    const waypoints = filtered.slice(1, -1).map(s => `${s.latitude},${s.longitude}`);
+    const origin = selected[0];
+    const destination = selected[selected.length - 1];
+    const waypoints = selected.slice(1, -1).join("|");
 
     const url =
-        "https://www.google.com/maps/dir/?api=1" +
-        `&origin=${origin}` +
-        `&destination=${destination}` +
-        `&waypoints=optimize:true|${waypoints.join("|")}`;
+        `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=optimize:true|${waypoints}`;
 
     window.open(url, "_blank");
 }
