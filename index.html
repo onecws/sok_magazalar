@@ -2,28 +2,120 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<title>Mağaza Listesi + Rota Oluşturucu</title>
+<title>Mağaza Listesi & Rota Oluşturucu</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
-body { font-family: Arial; padding: 20px; }
-.store { padding: 10px; border-bottom: 1px solid #ccc; }
+    body {
+        font-family: Arial, sans-serif;
+        background: #f4f6f9;
+        margin: 0;
+        padding: 0;
+    }
+
+    header {
+        background: #004aad;
+        color: white;
+        padding: 20px;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+        letter-spacing: 0.5px;
+    }
+
+    .container {
+        max-width: 850px;
+        margin: auto;
+        padding: 20px;
+    }
+
+    .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+
+    input, select {
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        font-size: 16px;
+        flex: 1;
+        min-width: 180px;
+    }
+
+    button {
+        background: #004aad;
+        color: white;
+        border: none;
+        padding: 14px 20px;
+        font-size: 17px;
+        border-radius: 8px;
+        cursor: pointer;
+        margin-bottom: 20px;
+    }
+
+    button:hover {
+        background: #00347a;
+    }
+
+    .store {
+        background: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: 0.2s ease;
+    }
+
+    .store:hover {
+        transform: scale(1.01);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .store b {
+        font-size: 18px;
+        color: #004aad;
+    }
+
+    .distance {
+        font-size: 13px;
+        color: #666;
+    }
+
+    @media(max-width: 600px) {
+        header {
+            font-size: 20px;
+        }
+        input, select {
+            font-size: 14px;
+            padding: 10px;
+        }
+        button {
+            font-size: 15px;
+        }
+    }
 </style>
 </head>
 
 <body>
 
-<h2>Mağaza Arama & Rota Oluşturma</h2>
+<header>ŞOK Mağaza Listesi & Rota Oluşturucu</header>
 
-<input type="text" id="search" placeholder="Mağaza / il / ilçe ara..." style="width:300px;"><br><br>
+<div class="container">
 
-<select id="cityFilter"></select>
-<select id="districtFilter"></select>
-<br><br>
+    <div class="filters">
+        <input type="text" id="searchInput" placeholder="Mağaza / İl / İlçe ara...">
+        <select id="cityFilter"></select>
+        <select id="districtFilter"></select>
+    </div>
 
-<button onclick="createRoute()">Google Maps Rota Oluştur</button>
+    <button onclick="createRoute()">Google Maps ile Rota Oluştur</button>
 
-<hr>
+    <div id="storeList"></div>
 
-<div id="storeList"></div>
+</div>
 
 <script>
 let stores = [];
@@ -34,16 +126,17 @@ async function loadStores() {
     stores = await res.json();
     filtered = stores;
 
-    loadCityFilter();
+    populateCityFilter();
+    populateDistrictFilter();
     renderStores();
 }
 
-function loadCityFilter() {
-    const citySelect = document.getElementById("cityFilter");
+function populateCityFilter() {
     const cities = [...new Set(stores.map(s => s.city))];
+    const citySelect = document.getElementById("cityFilter");
 
     citySelect.innerHTML = "<option value=''>Tüm Şehirler</option>" +
-      cities.map(c => `<option value='${c}'>${c}</option>`).join("");
+        cities.map(c => `<option value="${c}">${c}</option>`).join("");
 
     citySelect.onchange = () => {
         const city = citySelect.value;
@@ -52,32 +145,31 @@ function loadCityFilter() {
         } else {
             filtered = stores;
         }
-        loadDistrictFilter();
+        populateDistrictFilter();
         renderStores();
     };
-
-    loadDistrictFilter();
 }
 
-function loadDistrictFilter() {
+function populateDistrictFilter() {
     const districtSelect = document.getElementById("districtFilter");
+
     const districts = [...new Set(filtered.map(s => s.district))];
 
     districtSelect.innerHTML = "<option value=''>Tüm İlçeler</option>" +
-        districts.map(d => `<option value='${d}'>${d}</option>`).join("");
+        districts.map(d => `<option value="${d}">${d}</option>`).join("");
 
     districtSelect.onchange = () => {
         const district = districtSelect.value;
-        if (district)
+        if (district) {
             filtered = filtered.filter(s => s.district === district);
-        else
+        } else {
             filtered = stores;
-
+        }
         renderStores();
     };
 }
 
-document.getElementById("search").oninput = e => {
+document.getElementById("searchInput").oninput = (e) => {
     const q = e.target.value.toLowerCase();
     filtered = stores.filter(s =>
         s.name.toLowerCase().includes(q) ||
@@ -88,26 +180,26 @@ document.getElementById("search").oninput = e => {
 };
 
 function renderStores() {
-    document.getElementById("storeList").innerHTML =
-        filtered.map(s => `
-            <div class='store'>
-                <b>${s.name}</b><br>
-                ${s.city} / ${s.district}<br>
-                ${s.address}<br>
-                <small>${s.distance_km} km</small>
-            </div>
-        `).join("");
+    const container = document.getElementById("storeList");
+    container.innerHTML = filtered.map(s => `
+        <div class="store">
+            <b>${s.name}</b><br>
+            ${s.city} / ${s.district}<br>
+            ${s.address}<br>
+            <span class="distance">${s.distance_km} km uzaklıkta</span>
+        </div>
+    `).join("");
 }
 
 function createRoute() {
-    if (filtered.length === 0) return alert("Mağaza bulunamadı.");
+    if (filtered.length < 2) {
+        alert("Rota için en az 2 mağaza seçilmeli (filtrelediğin mağazalar).");
+        return;
+    }
 
-    const origin = `${stores[0].latitude},${stores[0].longitude}`;
-    const destination = `${filtered[filtered.length-1].latitude},${filtered[filtered.length-1].longitude}`;
-
-    const waypoints = filtered.slice(1, -1).map(s =>
-        `${s.latitude},${s.longitude}`
-    );
+    const origin = `${filtered[0].latitude},${filtered[0].longitude}`;
+    const destination = `${filtered[filtered.length - 1].latitude},${filtered[filtered.length - 1].longitude}`;
+    const waypoints = filtered.slice(1, -1).map(s => `${s.latitude},${s.longitude}`);
 
     const url =
         "https://www.google.com/maps/dir/?api=1" +
