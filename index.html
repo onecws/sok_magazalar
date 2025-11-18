@@ -1,101 +1,316 @@
-import requests
-import json
-import os
-
-# --- Ayarlar ---
-BASE_URL = "https://kurumsal.sokmarket.com.tr"
-API_URLS = {
-    "sehirler": "/ajax/servis/sehirler",
-    "ilceler": "/ajax/servis/ilceler",
-    "magazalar": "/ajax/servis/magazalarimiz"
-}
-OUTPUT_FILE = "magazalar.json"
-# --- ---
-
-def fetch_data(session, url, params=None):
-    """Belirtilen URL'den veri çeken yardımcı fonksiyon."""
-    try:
-        response = session.get(url, params=params, timeout=15)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"Hata: {url} adresine ulaşılamadı. {e}")
-        return None
-    except json.JSONDecodeError:
-        print(f"Hata: Geçersiz JSON yanıtı alındı: {url}")
-        return None
-
-def main():
-    """Tüm mağaza verilerini çekip JSON dosyasına kaydeder."""
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-        "Referer": f"{BASE_URL}/magazalarimiz"
-    })
-
-    print("1. Adım: Şehir listesi çekiliyor...")
-    sehir_data = fetch_data(session, f"{BASE_URL}{API_URLS['sehirler']}")
-    
-    if not sehir_data or "cities" not in sehir_data:
-        print("Şehirler alınamadı. Script durduruluyor.")
-        return
-
-    all_stores = []
-    total_store_count = 0
-    
-    cities = sehir_data["cities"]
-    print(f"Toplam {len(cities)} şehir bulundu.")
-
-    for city in cities:
-        print(f"\nİşleniyor: {city}")
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Şok Market Rota Oluşturucu</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 10px; /* Mobil için kenar boşluğunu azalt */
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px; /* Mobil için iç boşluğu azalt */
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        h2 {
+            color: #ff6000;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            font-size: 1.5em; /* Başlığı biraz küçült */
+        }
         
-        ilce_data = fetch_data(session, f"{BASE_URL}{API_URLS['ilceler']}", params={"city": city})
+        /* RESPONSIVE FİLTRE ALANI */
+        .filter-container {
+            display: flex;
+            flex-direction: column; /* Mobilde varsayılan olarak alt alta */
+            gap: 10px;
+            margin-bottom: 10px;
+        }
         
-        if not ilce_data or "districts" not in ilce_data:
-            print(f" - {city} için ilçeler alınamadı.")
-            continue
+        /* Tablet ve daha büyük ekranlar için filtreleri yan yana getir */
+        @media (min-width: 600px) {
+            .filter-container {
+                flex-direction: row; /* Geniş ekranda yan yana */
+            }
+        }
+
+        .filter-container select, #search-box {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #store-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #fafafa;
+        }
+        .store-item {
+            display: block;
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            line-height: 1.4; /* Metin okunaklılığı */
+        }
+        .store-item:hover {
+            background-color: #f0f0f0;
+        }
+        .store-item input {
+            margin-right: 10px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #555;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>🛒 Şok Mağazaları Rota Planlayıcı</h2>
         
-        districts = ilce_data["districts"]
+        <div class="filter-container">
+            <select id="filter-il">
+                <option value="">Tüm İller</option>
+            </select>
+            <select id="filter-ilce" disabled>
+                <option value="">Tüm İlçeler</option>
+            </select>
+        </div>
         
-        for district in districts:
-            print(f" - İlçe: {district} mağazaları çekiliyor...", end="", flush=True)
-            magaza_data = fetch_data(session, f"{BASE_URL}{API_URLS['magazalar']}", params={"city": city, "district": district})
-            
-            if not magaza_data or not magaza_data.get("response", {}).get("status", False):
-                print(" [veri yok]")
-                continue
+        <input type="text" id="search-box" placeholder="Arama (örn: Beşiktaş) ve filtreler...">
+
+        <div id="store-list">
+            <p id="loading-stores">Mağaza listesi (magazalar.json) yükleniyor...</p>
+        </div>
+
+        <button id="create-route-btn">Seçili Mağazalarla Rota Oluştur</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        // --- GLOBAL DEĞİŞKENLER ---
+        let allStoreData = [];
+        
+        const storeListDiv = document.getElementById('store-list');
+        const createRouteBtn = document.getElementById('create-route-btn');
+        const statusDiv = document.getElementById('status');
+        const searchBox = document.getElementById('search-box');
+        const loadingMessage = document.getElementById('loading-stores');
+        const filterIl = document.getElementById('filter-il');
+        const filterIlce = document.getElementById('filter-ilce');
+
+        // --- MAĞAZA YÜKLEME VE FİLTRELEME ---
+
+        async function loadStores() {
+            try {
+                const response = await fetch('magazalar.json');
                 
-            subeler = magaza_data.get("response", {}).get("subeler", [])
+                if (!response.ok) {
+                    throw new Error(`HTTP hatası! Durum: ${response.status}. 'magazalar.json' dosyası GitHub Actions ile oluşturuldu mu?`);
+                }
+                allStoreData = await response.json();
+                
+                loadingMessage.textContent = `${allStoreData.length} mağaza yüklendi.`;
+                
+                populateIlFilters();
+                applyFilters();
+
+            } catch (error) {
+                loadingMessage.textContent = `HATA: Mağazalar yüklenemedi. ${error.message}`;
+                loadingMessage.style.color = 'red';
+            }
+        }
+
+        function populateIlFilters() {
+            const cities = [...new Set(allStoreData.map(store => store.city))];
+            cities.sort();
             
-            if not subeler:
-                print(" [veri yok]")
-                continue
+            cities.forEach(city => {
+                const option = new Option(city, city);
+                filterIl.add(option);
+            });
+        }
 
-            print(f" [{len(subeler)} mağaza bulundu]")
+        function populateIlceFilters() {
+            const selectedCity = filterIl.value;
+            filterIlce.innerHTML = '<option value="">Tüm İlçeler</option>'; 
 
-            for sube in subeler:
-                # *** DÜZELTME: "YURTDIŞI" VE "TERS KOORDİNAT" SORUNU İÇİN ***
-                # Verilerin doğru anahtarlara atandığından ve virgül yerine nokta kullanıldığından emin ol
-                all_stores.append({
-                    "id": sube.get("id"),
-                    "name": sube.get("name"),
-                    "address": sube.get("address"),
-                    "city": city,
-                    "district": district,
-                    "latitude": str(sube.get("ltd")).replace(",", "."),  # ltd = Latitude (Enlem)
-                    "longitude": str(sube.get("lng")).replace(",", ".") # lng = Longitude (Boylam)
-                })
-            total_store_count += len(subeler)
+            if (selectedCity) {
+                const districts = [...new Set(
+                    allStoreData
+                        .filter(store => store.city === selectedCity)
+                        .map(store => store.district)
+                )];
+                districts.sort();
 
-    try:
-        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-            json.dump(all_stores, f, ensure_ascii=False, indent=4)
-        
-        print(f"\n--- BAŞARILI ---")
-        print(f"Toplam {total_store_count} mağaza verisi '{OUTPUT_FILE}' dosyasına kaydedildi.")
+                districts.forEach(district => {
+                    const option = new Option(district, district);
+                    filterIlce.add(option);
+                });
+                filterIlce.disabled = false;
+            } else {
+                filterIlce.disabled = true;
+            }
+        }
 
-    except IOError as e:
-        print(f"Hata: '{OUTPUT_FILE}' dosyası yazılamadı. {e}")
+        function applyFilters() {
+            const selectedCity = filterIl.value;
+            const selectedDistrict = filterIlce.value;
+            const searchQuery = searchBox.value.toLowerCase().trim();
 
-if __name__ == "__main__":
-    main()
+            let filteredStores = allStoreData;
+
+            if (selectedCity) {
+                filteredStores = filteredStores.filter(store => store.city === selectedCity);
+            }
+            if (selectedDistrict) {
+                filteredStores = filteredStores.filter(store => store.district === selectedDistrict);
+            }
+            if (searchQuery.length > 1) {
+                filteredStores = filteredStores.filter(store => {
+                    return store.name.toLowerCase().includes(searchQuery) || 
+                           store.address.toLowerCase().includes(searchQuery);
+                });
+            }
+
+            populateStoreList(filteredStores);
+        }
+
+        function populateStoreList(storesToDisplay) {
+            storeListDiv.innerHTML = ''; 
+
+            if (storesToDisplay.length === 0) {
+                storeListDiv.innerHTML = '<p>Filtrelerle eşleşen mağaza bulunamadı.</p>';
+                return;
+            }
+
+            storesToDisplay.forEach(store => {
+                const label = document.createElement('label');
+                label.className = 'store-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                
+                // Checkbox'ın değeri "latitude,longitude" formatında kesin koordinattır.
+                checkbox.value = `${store.latitude},${store.longitude}`; 
+                
+                checkbox.id = `store-${store.id || (store.latitude + store.longitude)}`;
+
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(` ${store.name} (${store.district}, ${store.city})`));
+                
+                storeListDiv.appendChild(label);
+            });
+        }
+
+        // --- ROTA OLUŞTURMA (SON DÜZELTME) ---
+
+        function createRoute() {
+            const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
+            if (selectedCheckboxes.length === 0) {
+                statusDiv.textContent = 'Lütfen en az bir mağaza seçin.';
+                return;
+            }
+            statusDiv.textContent = 'Konumunuz alınıyor...';
+            createRouteBtn.disabled = true;
+            if (!navigator.geolocation) {
+                statusDiv.textContent = 'Tarayıcınız konum servisini desteklemiyor.';
+                createRouteBtn.disabled = false;
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(onSuccess, onError);
+        }
+
+        function onSuccess(position) {
+            const userLocation = `${position.coords.latitude},${position.coords.longitude}`;
+            const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
+            
+            // "YURTDIŞI" SORUNU İÇİN DÜZELTME:
+            // Google'ın en stabil ve resmi rota oluşturma linkini kullanıyoruz.
+            const baseUrl = "https://www.google.com/maps/dir/?api=1&origin=[START]&destination=[END]&waypoints=[WAYPOINT1]|[WAYPOINT2]";
+
+            // Checkbox.value'dan "lat,lng" koordinatları geliyor
+            const waypointsArray = Array.from(selectedCheckboxes).map(cb => cb.value);
+
+            // Google'ın parametre tabanlı (en güvenilir) formatını oluşturalım:
+            // ?api=1&origin=...&destination=...&waypoints=...|...|...
+            const params = new URLSearchParams();
+            params.append("api", "1");
+            
+            // 1. Başlangıç (Kullanıcının konumu)
+            params.append("origin", userLocation);
+
+            // 2. Varış (Listenin son elemanı)
+            params.append("destination", waypointsArray[waypointsArray.length - 1]);
+
+            // 3. Ara Noktalar (Listenin geri kalanı)
+            if (waypointsArray.length > 1) {
+                const intermediatePoints = waypointsArray.slice(0, waypointsArray.length - 1);
+                // Ara noktaları "|" karakteri ile ayır
+                params.append("waypoints", intermediatePoints.join('|'));
+            }
+
+            // URL'i doğru formatta birleştir
+            const mapsUrl = `${baseUrl}?${params.toString()}`;
+
+            window.open(mapsUrl, '_blank'); // Rotayı yeni sekmede aç
+            
+            createRouteBtn.disabled = false;
+            statusDiv.textContent = '';
+        }
+
+        function onError(error) {
+            statusDiv.textContent = `Konum alınamadı. Hata: ${error.message}.`;
+            createRouteBtn.disabled = false;
+        }
+
+        // --- BAŞLANGIÇ ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStores();
+            createRouteBtn.addEventListener('click', createRoute);
+            
+            filterIl.addEventListener('change', () => {
+                populateIlceFilters();
+                applyFilters();
+            });
+            filterIlce.addEventListener('change', applyFilters);
+            searchBox.addEventListener('keyup', applyFilters);
+        });
+
+    </script>
+</body>
+</html>
