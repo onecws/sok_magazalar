@@ -74,17 +74,16 @@ def main():
             print(f" [{len(subeler)} mağaza bulundu]")
 
             for sube in subeler:
-                # *** DÜZELTME: "YURTDIŞI" VE "TERS KOORDİNAT" SORUNU İÇİN ***
-                # Verilerin doğru anahtarlara atandığından ve virgül yerine nokta kullanıldığından emin ol
-                all_stores.append({
-                    "id": sube.get("id"),
-                    "name": sube.get("name"),
-                    "address": sube.get("address"),
-                    "city": city,
-                    "district": district,
-                    "latitude": str(sube.get("ltd")).replace(",", "."),  # ltd = Latitude (Enlem)
-                    "longitude": str(sube.get("lng")).replace(",", ".") # lng = Longitude (Boylam)
-                })
+            all_stores.append({
+                "id": sube.get("id"),
+                "name": sube.get("name"),
+                "address": sube.get("address"),
+                "city": city,
+                "district": district,
+                # DİKKAT: BURADA YER DEĞİŞTİRİYORUZ
+                "latitude": str(sube.get("lng")).replace(",", "."),   # lng aslında enlem
+                "longitude": str(sube.get("ltd")).replace(",", ".")   # ltd aslında boylam
+            })
             total_store_count += len(subeler)
 
     try:
@@ -99,3 +98,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
