@@ -14,10 +14,8 @@ HEADERS = {
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371
     lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = sin(dlat/2)**2 + cos(lat1)*cos(lat2)*sin(dlon/2)**2
-    return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+    a = sin((lat2-lat1)/2)**2 + cos(lat1) * cos(lat2) * sin((lon2-lon1)/2)**2
+    return 2 * R * atan2(sqrt(a), sqrt(1 - a))
 
 def fetch_json(url, params=None):
     try:
@@ -27,7 +25,7 @@ def fetch_json(url, params=None):
     except:
         return None
 
-def fetch_html():
+def fetch_html_state():
     try:
         r = requests.get(f"{BASE_URL}/magazalarimiz", headers=HEADERS, timeout=20)
         r.raise_for_status()
@@ -39,47 +37,52 @@ def fetch_html():
         return None
 
 def get_from_api():
-    cities_data = fetch_json(f"{BASE_URL}/ajax/servis/sehirler")
-    if not cities_data or "response" not in cities_data:
+    cities_raw = fetch_json(f"{BASE_URL}/ajax/servis/sehirler")
+    if not cities_raw or "response" not in cities_raw:
         return None
 
-    cities = [c["sehir"] for c in cities_data["response"]["sehirler"]]
-    all_stores = []
+    stores = []
+    for city_obj in cities_raw["response"]["sehirler"]:
+        city = city_obj["sehir"]
 
-    for city in cities:
-        ilce_data = fetch_json(f"{BASE_URL}/ajax/servis/ilceler", {"city": city})
-        if not ilce_data or "response" not in ilce_data:
+        districts_raw = fetch_json(f"{BASE_URL}/ajax/servis/ilceler", {"city": city})
+        if not districts_raw or "response" not in districts_raw:
             continue
-        districts = [d["ilce"] for d in ilce_data["response"]["ilceler"]]
 
-        for district in districts:
-            store_data = fetch_json(
+        for d in districts_raw["response"]["ilceler"]:
+            district = d["ilce"]
+
+            mjson = fetch_json(
                 f"{BASE_URL}/ajax/servis/magazalarimiz",
                 {"city": city, "district": district}
             )
-            if not store_data or not store_data.get("response", {}).get("status", False):
+
+            if (
+                not mjson
+                or not mjson.get("response", {}).get("status", False)
+            ):
                 continue
 
-            for s in store_data["response"]["subeler"]:
-                lat = float(str(s.get("lng")).replace(",", "."))
-                lng = float(str(s.get("ltd")).replace(",", "."))
-
-                all_stores.append({
+            for s in mjson["response"]["subeler"]:
+                stores.append({
                     "id": s["id"],
                     "name": s["name"],
                     "address": s["address"],
                     "city": city,
                     "district": district,
-                    "latitude": lat,
-                    "longitude": lng,
+                    "latitude": float(str(s.get("lng")).replace(",", ".")),
+                    "longitude": float(str(s.get("ltd")).replace(",", ".")),
                 })
 
-    return all_stores
+    return stores
 
 def get_from_html(state):
-    stores = []
-    for s in state.get("stores", []):
-        stores.append({
+    if not state or "stores" not in state:
+        return None
+
+    out = []
+    for s in state["stores"]:
+        out.append({
             "id": s["id"],
             "name": s["name"],
             "address": s["address"],
@@ -88,29 +91,42 @@ def get_from_html(state):
             "latitude": float(s["latitude"]),
             "longitude": float(s["longitude"]),
         })
-    return stores
+    return out
+
+def safe_write_empty_json():
+    """Son fallback: boş fakat geçerli JSON üretir."""
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump([], f)
+    print("⚠ Veri alınamadı → Boş JSON oluşturuldu.")
 
 def main():
     stores = get_from_api()
-    if stores is None:
-        state = fetch_html()
-        stores = get_from_html(state)
 
+    if stores is None:
+        html_state = fetch_html_state()
+        stores = get_from_html(html_state)
+
+    # API + HTML fallback başarısız → Boş JSON yaz ve çık
+    if stores is None:
+        safe_write_empty_json()
+        return
+
+    # Distance hesaplama
     USER_LAT = 41.016431
     USER_LNG = 28.955997
-
     for s in stores:
         s["distance_km"] = round(
             haversine(USER_LAT, USER_LNG, s["latitude"], s["longitude"]),
             2
         )
 
-    stores = sorted(stores, key=lambda x: x["distance_km"])
+    stores.sort(key=lambda x: x["distance_km"])
 
+    # JSON minify
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(stores, f, ensure_ascii=False, separators=(",", ":"))
 
-    print("OK")
+    print("🎉 Mağaza verileri başarıyla oluşturuldu.")
 
 if __name__ == "__main__":
     main()
