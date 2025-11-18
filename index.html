@@ -139,13 +139,6 @@
                 // --- TEST BAŞLANGICI ---
                 console.log("TEST MODU: Sabit veriler kullanılıyor.");
                 
-                // 'magazalar.json' yüklemesini geçici olarak devre dışı bırakıyoruz.
-                // const response = await fetch('magazalar.json');
-                // if (!response.ok) {
-                //     throw new Error(`HTTP hatası! Durum: ${response.status}. 'magazalar.json' dosyası GitHub Actions ile oluşturuldu mu?`);
-                // }
-                // allStoreData = await response.json();
-
                 // Zonguldak için DOĞRU SIRALAMA (Lat 41, Lng 31) ile 2 mağazalık test verisi
                 allStoreData = [
                     {
@@ -251,9 +244,7 @@
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 
-                // Checkbox'ın değeri "latitude,longitude" formatında kesin koordinattır.
                 checkbox.value = `${store.latitude},${store.longitude}`; 
-                
                 checkbox.id = `store-${store.id || (store.latitude + store.longitude)}`;
 
                 label.appendChild(checkbox);
@@ -263,7 +254,7 @@
             });
         }
 
-        // --- ROTA OLUŞTURMA (SON VE EN STABİL VERSİYON) ---
+        // --- ROTA OLUŞTURMA (404 HATASI DÜZELTMESİ) ---
 
         function createRoute() {
             const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
@@ -285,34 +276,27 @@
             const userLocation = `${position.coords.latitude},${position.coords.longitude}`;
             const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
             
-            // Google'ın en stabil ve resmi rota oluşturma linkini kullanıyoruz.
-            const baseUrl = "http://googleusercontent.com/maps/google.com/0";
+            // *** DÜZELTME: 404 HATASI İÇİN ***
+            // Hatalı "googleusercontent.com" adresi yerine, DOĞRU ve halka açık
+            // "www.google.com/maps/" adresini kullanıyoruz.
+            const baseUrl = "https://www.google.com/maps/dir/?api=1&origin=Baslangic&destination=Varis&waypoints=Durak1|Durak2|Durak3";
 
-            // Checkbox.value'dan "lat,lng" koordinatları geliyor
             const waypointsArray = Array.from(selectedCheckboxes).map(cb => cb.value);
 
-            // Google'ın parametre tabanlı (en güvenilir) formatını oluşturalım:
-            // ?api=1&origin=...&destination=...&waypoints=...|...|...
             const params = new URLSearchParams();
             params.append("api", "1");
             
-            // 1. Başlangıç (Kullanıcının konumu)
             params.append("origin", userLocation);
-
-            // 2. Varış (Listenin son elemanı)
             params.append("destination", waypointsArray[waypointsArray.length - 1]);
 
-            // 3. Ara Noktalar (Listenin geri kalanı)
             if (waypointsArray.length > 1) {
                 const intermediatePoints = waypointsArray.slice(0, waypointsArray.length - 1);
-                // Ara noktaları "|" karakteri ile ayır
                 params.append("waypoints", intermediatePoints.join('|'));
             }
 
-            // URL'i doğru formatta birleştir
             const mapsUrl = `${baseUrl}?${params.toString()}`;
 
-            window.open(mapsUrl, '_blank'); // Rotayı yeni sekmede aç
+            window.open(mapsUrl, '_blank'); 
             
             createRouteBtn.disabled = false;
             statusDiv.textContent = '';
