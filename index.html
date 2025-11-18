@@ -256,42 +256,36 @@
         }
 
         function onSuccess(position) {
-            const userLocation = `${position.coords.latitude},${position.coords.longitude}`;
-            const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
-            
-            // "YURTDIŞI" SORUNU İÇİN DÜZELTME:
-            // Google'ın en stabil ve resmi rota oluşturma linkini kullanıyoruz.
-            const baseUrl = "https://www.google.com/maps/dir/?api=1&origin=[START]&destination=[END]&waypoints=[WAYPOINT1]|[WAYPOINT2]";
+    const userLocation = `${position.coords.latitude},${position.coords.longitude}`;
+    const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
+    
+    // Sadece base path, içinde parametre YOK!
+    const baseUrl = "https://www.google.com/maps/dir/";
 
-            // Checkbox.value'dan "lat,lng" koordinatları geliyor
-            const waypointsArray = Array.from(selectedCheckboxes).map(cb => cb.value);
+    const waypointsArray = Array.from(selectedCheckboxes).map(cb => cb.value);
 
-            // Google'ın parametre tabanlı (en güvenilir) formatını oluşturalım:
-            // ?api=1&origin=...&destination=...&waypoints=...|...|...
-            const params = new URLSearchParams();
-            params.append("api", "1");
-            
-            // 1. Başlangıç (Kullanıcının konumu)
-            params.append("origin", userLocation);
+    const params = new URLSearchParams();
+    params.append("api", "1");
 
-            // 2. Varış (Listenin son elemanı)
-            params.append("destination", waypointsArray[waypointsArray.length - 1]);
+    // 1. Başlangıç = kullanıcının konumu
+    params.append("origin", userLocation);
 
-            // 3. Ara Noktalar (Listenin geri kalanı)
-            if (waypointsArray.length > 1) {
-                const intermediatePoints = waypointsArray.slice(0, waypointsArray.length - 1);
-                // Ara noktaları "|" karakteri ile ayır
-                params.append("waypoints", intermediatePoints.join('|'));
-            }
+    // 2. Varış = seçili mağazaların sonuncusu
+    params.append("destination", waypointsArray[waypointsArray.length - 1]);
 
-            // URL'i doğru formatta birleştir
-            const mapsUrl = `${baseUrl}?${params.toString()}`;
+    // 3. Ara noktalar = sonuncu hariç diğerleri
+    if (waypointsArray.length > 1) {
+        const intermediatePoints = waypointsArray.slice(0, waypointsArray.length - 1);
+        params.append("waypoints", intermediatePoints.join('|'));
+    }
 
-            window.open(mapsUrl, '_blank'); // Rotayı yeni sekmede aç
-            
-            createRouteBtn.disabled = false;
-            statusDiv.textContent = '';
-        }
+    const mapsUrl = `${baseUrl}?${params.toString()}`;
+
+    window.open(mapsUrl, '_blank');
+    
+    createRouteBtn.disabled = false;
+    statusDiv.textContent = '';
+}
 
         function onError(error) {
             statusDiv.textContent = `Konum alınamadı. Hata: ${error.message}.`;
@@ -314,3 +308,4 @@
     </script>
 </body>
 </html>
+
