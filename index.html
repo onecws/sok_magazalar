@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Şok Market Rota Oluşturucu</title>
+    <title>Şok Market Rota Oluşturucu (TEST MODU)</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -114,7 +114,7 @@
         <input type="text" id="search-box" placeholder="Arama (örn: Beşiktaş) ve filtreler...">
 
         <div id="store-list">
-            <p id="loading-stores">Mağaza listesi (magazalar.json) yükleniyor...</p>
+            <p id="loading-stores">Mağaza listesi (TEST MODU) yükleniyor...</p>
         </div>
 
         <button id="create-route-btn">Seçili Mağazalarla Rota Oluştur</button>
@@ -133,9 +133,53 @@
         const filterIl = document.getElementById('filter-il');
         const filterIlce = document.getElementById('filter-ilce');
 
-        // --- MAĞAZA YÜKLEME VE FİLTRELEME ---
+        // --- MAĞAZA YÜKLEME (TEST MODU) ---
+        async function loadStores() {
+            try {
+                // --- TEST BAŞLANGICI ---
+                console.log("TEST MODU: Sabit veriler kullanılıyor.");
+                
+                // 'magazalar.json' yüklemesini geçici olarak devre dışı bırakıyoruz.
+                // const response = await fetch('magazalar.json');
+                // if (!response.ok) {
+                //     throw new Error(`HTTP hatası! Durum: ${response.status}. 'magazalar.json' dosyası GitHub Actions ile oluşturuldu mu?`);
+                // }
+                // allStoreData = await response.json();
 
-            
+                // Zonguldak için DOĞRU SIRALAMA (Lat 41, Lng 31) ile 2 mağazalık test verisi
+                allStoreData = [
+                    {
+                        "id": 11111,
+                        "name": "TEST ZONGULDAK MAĞAZASI",
+                        "address": "Test Adresi 1",
+                        "city": "ZONGULDAK",
+                        "district": "MERKEZ",
+                        "latitude": "41.450602",  // DOĞRU ENLEM (41...)
+                        "longitude": "31.784332" // DOĞRU BOYLAM (31...)
+                    },
+                    {
+                        "id": 22222,
+                        "name": "TEST İSTANBUL MAĞAZASI",
+                        "address": "Test Adresi 2",
+                        "city": "İSTANBUL",
+                        "district": "BEŞİKTAŞ",
+                        "latitude": "41.0441",
+                        "longitude": "29.0067"
+                    }
+                ];
+                
+                // --- TEST SONU ---
+
+                loadingMessage.textContent = `${allStoreData.length} TEST MAĞAZASI YÜKLENDİ.`;
+                
+                populateIlFilters();
+                applyFilters();
+
+            } catch (error) {
+                loadingMessage.textContent = `HATA: Mağazalar yüklenemedi. ${error.message}`;
+                loadingMessage.style.color = 'red';
+            }
+        }
 
         function populateIlFilters() {
             const cities = [...new Set(allStoreData.map(store => store.city))];
@@ -219,7 +263,7 @@
             });
         }
 
-        // --- ROTA OLUŞTURMA (SON DÜZELTME) ---
+        // --- ROTA OLUŞTURMA (SON VE EN STABİL VERSİYON) ---
 
         function createRoute() {
             const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
@@ -241,9 +285,8 @@
             const userLocation = `${position.coords.latitude},${position.coords.longitude}`;
             const selectedCheckboxes = document.querySelectorAll('#store-list input[type="checkbox"]:checked');
             
-            // "YURTDIŞI" SORUNU İÇİN DÜZELTME:
             // Google'ın en stabil ve resmi rota oluşturma linkini kullanıyoruz.
-            const baseUrl = "https://www.google.com/maps/dir/?api=1&origin=[START]&destination=[END]&waypoints=[WAYPOINT1]|[WAYPOINT2]";
+            const baseUrl = "http://googleusercontent.com/maps/google.com/0";
 
             // Checkbox.value'dan "lat,lng" koordinatları geliyor
             const waypointsArray = Array.from(selectedCheckboxes).map(cb => cb.value);
@@ -280,7 +323,7 @@
             createRouteBtn.disabled = false;
         }
 
-        // --- BAŞLANGIŞ ---
+        // --- BAŞLANGIÇ ---
         document.addEventListener('DOMContentLoaded', () => {
             loadStores();
             createRouteBtn.addEventListener('click', createRoute);
@@ -296,4 +339,3 @@
     </script>
 </body>
 </html>
-
